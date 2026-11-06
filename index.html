@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Neckmap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: board-first workbench. The neck spans the top; three layer strips sit below it, one per overlay. */
+:root{
+  --bg:#eceeef; --surface:#ffffff; --raised:#f5f6f7; --fg:#15181b; --muted:#555d65; --line:#ccd1d5; --accent:#0072B2;
+  --board:#dcc59b; --fret:#8d969c; --string:#3f444a; --inlay:#f8f2e4; --nut:#faf6ec; --ink:#15181b;
+  --f-ui:'Barlow Semi Condensed','Arial Narrow',system-ui,sans-serif;
+  --f-body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111316; --surface:#1a1d21; --raised:#22262b; --fg:#eceef0; --muted:#9ca3aa; --line:#30353b; --accent:#56B4E9;
+  --board:#2b211a; --fret:#8b9399; --string:#cfc8bb; --inlay:#5c4d40; --nut:#e3dccd; --ink:#0b0c0d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111316; --surface:#1a1d21; --raised:#22262b; --fg:#eceef0; --muted:#9ca3aa; --line:#30353b; --accent:#56B4E9;
+  --board:#2b211a; --fret:#8b9399; --string:#cfc8bb; --inlay:#5c4d40; --nut:#e3dccd; --ink:#0b0c0d; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:16px}
+.wrap>*{min-width:0}
+h1,h2,h3{font-family:var(--f-ui);margin:0;text-wrap:balance}
+header.top{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px}
+.brand h1{font-size:30px;font-weight:700;letter-spacing:.01em;line-height:1}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.lbl{display:block;font-family:var(--f-ui);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+select,button{font:inherit;font-family:var(--f-ui);font-size:15px;font-weight:500;color:var(--fg);background:var(--surface);
+  border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-height:36px}
+select{padding-right:26px}
+select:disabled{opacity:.55}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.globals{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:end;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.field{display:flex;flex-direction:column;min-width:0}
+.field.key select{font-size:18px;font-weight:700;min-width:96px}
+.parent{font-family:var(--f-ui);font-size:15px;padding:7px 0;color:var(--muted)}
+.parent b{color:var(--fg)}
+.sep{width:1px;align-self:stretch;background:var(--line)}
+.check{display:flex;align-items:center;gap:6px;font-family:var(--f-ui);font-size:15px;min-height:36px}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.range{display:flex;align-items:center;gap:6px}
+
+.board-panel{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 0 12px}
+.board-scroll{overflow-x:auto;padding:0 10px}
+#board{display:block;width:100%;min-width:820px;height:auto}
+#board text{font-family:var(--f-ui)}
+.shape-tab{cursor:pointer}
+.shape-tab:focus{outline:none}
+.shape-tab:focus-visible rect{stroke:var(--accent);stroke-width:3;stroke-opacity:1}
+#tip{position:absolute;z-index:5;pointer-events:none;background:var(--fg);color:var(--bg);font-family:var(--f-ui);font-size:14px;line-height:1.35;padding:7px 10px;border-radius:6px;max-width:260px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#tip b{font-weight:700}
+.iso-note{font-family:var(--f-ui);font-weight:600;color:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;padding:8px 16px 0;color:var(--muted);font-size:13.5px;font-family:var(--f-ui)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{flex:none}
+
+.summary{display:grid;gap:6px;padding:10px 16px 0;font-size:14.5px}
+.summary .row{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.summary .tag{font-family:var(--f-ui);font-weight:700;min-width:84px}
+.summary .notes{font-family:var(--f-ui);font-weight:600;letter-spacing:.02em}
+.summary .warn{color:var(--muted);font-style:italic}
+
+.layers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.layers{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:12px;align-content:start}
+.card.off .body{opacity:.45}
+.card-head{display:flex;align-items:center;gap:10px}
+.card-head h2{font-size:20px;font-weight:700;flex:1}
+.eye{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;min-height:32px;font-size:14px}
+.eye[aria-pressed="false"]{color:var(--muted);border-style:dashed}
+.body{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.body .full{grid-column:1/-1}
+.body select{width:100%}
+.hint{font-size:13px;color:var(--muted);margin:0}
+
+details.a11y{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+details.a11y summary{font-family:var(--f-ui);font-weight:700;font-size:16px;cursor:pointer}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;font-size:14px;margin-top:8px;font-variant-numeric:tabular-nums;min-width:560px}
+th,td{text-align:left;padding:5px 10px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-ui);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.pass{font-weight:600}
+.fail{font-weight:700;text-decoration:underline}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid var(--ink)}
+details.a11y p{margin:8px 0 0;color:var(--muted);font-size:13.5px;max-width:75ch}
+@media (prefers-reduced-motion:no-preference){.card{transition:opacity .15s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Neckmap</h1>
+      <p>Scales, modes, pentatonic boxes and CAGED chords on one neck</p>
+    </div>
+  </header>
+
+  <section class="globals" aria-label="Key and display">
+    <div class="field key"><label class="lbl" for="g-key">Key</label><select id="g-key"></select></div>
+    <div class="field"><label class="lbl" for="g-mode">Mode</label><select id="g-mode"></select></div>
+    <div class="field"><span class="lbl">Parent major</span><div class="parent" id="g-parent">–</div></div>
+    <div class="field"><label class="lbl" for="g-spell">Spelling</label>
+      <select id="g-spell"><option value="auto">Auto</option><option value="sharp">Sharps ♯</option><option value="flat">Flats ♭</option></select></div>
+    <span class="sep" aria-hidden="true"></span>
+    <div class="field"><span class="lbl">Frets shown</span>
+      <div class="range"><select id="g-lo" aria-label="Lowest fret shown"></select><span aria-hidden="true">to</span><select id="g-hi" aria-label="Highest fret shown"></select></div></div>
+    <div class="field"><span class="lbl">Hand</span><label class="check"><input type="checkbox" id="g-lefty"> Left-handed</label></div>
+    <div class="field"><label class="lbl" for="g-theme">Theme</label>
+      <select id="g-theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+  </section>
+
+  <section class="board-panel" aria-label="Fretboard">
+    <div class="board-scroll"><svg id="board" role="img" aria-label="Guitar fretboard"></svg></div>
+    <div id="tip" hidden></div>
+    <div class="legend" id="legend"></div>
+    <div class="summary" id="summary" aria-live="polite"></div>
+  </section>
+
+  <section class="layers">
+    <article class="card" id="card-chord">
+      <div class="card-head"><span id="ico-chord"></span><h2>Chord</h2>
+        <button class="eye" id="chord-on" aria-pressed="true">Shown</button></div>
+      <div class="body">
+        <div class="field"><label class="lbl" for="chord-source">Source</label>
+          <select id="chord-source"><option value="diatonic">In this key</option><option value="custom">Custom chord</option></select></div>
+        <div class="field" id="f-chord-ext"><label class="lbl" for="chord-ext">Type</label>
+          <select id="chord-ext"><option value="triad">Triads</option><option value="seventh">7th chords</option></select></div>
+        <div class="field full" id="f-chord-degree"><label class="lbl" for="chord-degree">Chord · Nashville number</label><select id="chord-degree"></select></div>
+        <div class="field" id="f-chord-root" hidden><label class="lbl" for="chord-root">Root</label><select id="chord-root"></select></div>
+        <div class="field" id="f-chord-quality" hidden><label class="lbl" for="chord-quality">Quality</label><select id="chord-quality"></select></div>
+        <div class="field"><label class="lbl" for="chord-caged">CAGED shape</label>
+          <select id="chord-caged">
+            <option value="all">All five shapes</option><option value="C">C shape</option><option value="A">A shape</option>
+            <option value="G">G shape</option><option value="E">E shape</option><option value="D">D shape</option>
+            <option value="none">No shape (every chord tone)</option></select></div>
+        <div class="field"><label class="lbl" for="chord-shapes">Shape display</label>
+          <select id="chord-shapes"><option value="bands">Shaded bands</option><option value="lines">Dashed lines</option><option value="off">Off</option></select></div>
+        <div class="field"><label class="lbl" for="chord-label">Labels</label><select id="chord-label" class="labelsel"></select></div>
+        <div class="field"><label class="lbl" for="chord-color">Colour</label><select id="chord-color" class="colorsel"></select></div>
+      </div>
+    </article>
+
+    <article class="card" id="card-penta">
+      <div class="card-head"><span id="ico-penta"></span><h2>Pentatonic</h2>
+        <button class="eye" id="penta-on" aria-pressed="true">Shown</button></div>
+      <div class="body">
+        <div class="field full"><label class="lbl" for="penta-type">Type</label>
+          <select id="penta-type"><option value="auto">Match the mode</option><option value="min">Minor pentatonic</option><option value="maj">Major pentatonic</option></select></div>
+        <div class="field full"><label class="lbl" for="penta-box">Position</label><select id="penta-box"></select></div>
+        <div class="field"><label class="lbl" for="penta-label">Labels</label><select id="penta-label" class="labelsel"></select></div>
+        <div class="field"><label class="lbl" for="penta-color">Colour</label><select id="penta-color" class="colorsel"></select></div>
+        <p class="hint full">Box 1 starts on the root on the low E string; each box uses two notes per string.</p>
+      </div>
+    </article>
+
+    <article class="card" id="card-scale">
+      <div class="card-head"><span id="ico-scale"></span><h2>Scale / mode</h2>
+        <button class="eye" id="scale-on" aria-pressed="true">Shown</button></div>
+      <div class="body">
+        <div class="field full"><label class="lbl" for="scale-type">Scale</label><select id="scale-type"></select></div>
+        <div class="field full"><label class="lbl" for="scale-pos">Position</label><select id="scale-pos"></select></div>
+        <div class="field"><label class="lbl" for="scale-label">Labels</label><select id="scale-label" class="labelsel"></select></div>
+        <div class="field"><label class="lbl" for="scale-color">Colour</label><select id="scale-color" class="colorsel"></select></div>
+        <p class="hint full">Positions use three notes per string and need a seven-note scale.</p>
+      </div>
+    </article>
+  </section>
+
+  <details class="a11y" id="a11y">
+    <summary>Contrast check</summary>
+    <div class="tbl-wrap"><table><thead><tr><th>Layer</th><th>Colour</th><th>vs. board</th><th>vs. open-string area</th><th>Label text</th><th>Result</th></tr></thead><tbody id="a11y-body"></tbody></table></div>
+    <p>Ratios use the WCAG 2 formula. Note markers need 3:1 against what surrounds them (SC 1.4.11) and label text needs 4.5:1 against its marker (SC 1.4.3). When a colour falls below 3:1 against the board, the marker gets a dark outline, and the outline is what carries the contrast. Layers also differ by shape (circle, square, diamond), so colour is never the only cue. Colours come from the Okabe–Ito colour-blind-safe palette.</p>
+  </details>
+</div>
+
+<script>
+/* ---------- Theory engine ---------- */
+const LET=['C','D','E','F','G','A','B'], LPC=[0,2,4,5,7,9,11], MAJ=[0,2,4,5,7,9,11];
+const TOK={'1':[0,1],'b2':[1,2],'2':[2,2],'#2':[3,2],'b3':[3,3],'3':[4,3],'4':[5,4],'#4':[6,4],'b5':[6,5],'5':[7,5],'#5':[8,5],'b6':[8,6],'6':[9,6],'bb7':[9,7],'b7':[10,7],'7':[11,7]};
+const IVL={'1':'R','b2':'m2','2':'M2','#2':'A2','b3':'m3','3':'M3','4':'P4','#4':'A4','b5':'d5','5':'P5','#5':'A5','b6':'m6','6':'M6','bb7':'d7','b7':'m7','7':'M7'};
+const mod=(n,m)=>((n%m)+m)%m;
+const note=(L,acc)=>({L,acc,pc:mod(LPC[L]+acc,12)});
+function spell(root,tok){const [s,d]=TOK[tok];const L=(root.L+d-1)%7;const pc=mod(root.pc+s,12);let acc=mod(pc-LPC[L],12);if(acc>6)acc-=12;return note(L,acc)}
+const nm=n=>LET[n.L]+(n.acc>0?'♯'.repeat(n.acc):'♭'.repeat(-n.acc));
+function between(root,n){const d=mod(n.L-root.L,7)+1;let diff=mod(n.pc-root.pc,12)-MAJ[d-1];if(diff>6)diff-=12;if(diff<-6)diff+=12;return (diff<0?'b'.repeat(-diff):'#'.repeat(diff))+d}
+const disp=t=>t.replace(/b/g,'♭').replace(/#/g,'♯');
+
+const MODES=[
+ {id:'ionian',name:'Ionian (major)',t:['1','2','3','4','5','6','7'],parent:'1',penta:'maj'},
+ {id:'dorian',name:'Dorian',t:['1','2','b3','4','5','6','b7'],parent:'b7',penta:'min'},
+ {id:'phrygian',name:'Phrygian',t:['1','b2','b3','4','5','b6','b7'],parent:'b6',penta:'min'},
+ {id:'lydian',name:'Lydian',t:['1','2','3','#4','5','6','7'],parent:'5',penta:'maj'},
+ {id:'mixolydian',name:'Mixolydian',t:['1','2','3','4','5','6','b7'],parent:'4',penta:'maj'},
+ {id:'aeolian',name:'Aeolian (natural minor)',t:['1','2','b3','4','5','b6','b7'],parent:'b3',penta:'min'},
+ {id:'locrian',name:'Locrian',t:['1','b2','b3','4','b5','b6','b7'],parent:'b2',penta:'min'}];
+const EXTRA={harm:{name:'Harmonic minor',t:['1','2','b3','4','5','b6','7']},mel:{name:'Melodic minor',t:['1','2','b3','4','5','6','7']},
+ blues:{name:'Minor blues',t:['1','b3','4','b5','5','b7']},majblues:{name:'Major blues',t:['1','2','b3','3','5','6']}};
+const PENTA={min:{name:'minor pentatonic',t:['1','b3','4','5','b7']},maj:{name:'major pentatonic',t:['1','2','3','5','6']}};
+
+const QUAL={
+ maj:{ns:'',name:'Major',suf:'',t:['1','3','5'],map:{}},
+ min:{ns:'m',name:'Minor',suf:'m',t:['1','b3','5'],map:{'3':'b3'}},
+ '5':{ns:'⁵',name:'Power chord',suf:'5',t:['1','5'],map:{'3':null}},
+ sus2:{ns:'sus2',name:'Sus2',suf:'sus2',t:['1','2','5'],map:{'3':'2'}},
+ sus4:{ns:'sus4',name:'Sus4',suf:'sus4',t:['1','4','5'],map:{'3':'4'}},
+ dim:{ns:'°',name:'Diminished',suf:'°',t:['1','b3','b5'],map:{'3':'b3','5':'b5'}},
+ aug:{ns:'+',name:'Augmented',suf:'+',t:['1','3','#5'],map:{'5':'#5'}},
+ '6':{ns:'⁶',name:'Major 6',suf:'6',t:['1','3','5','6'],map:{},slot:['6','6']},
+ m6:{ns:'m⁶',name:'Minor 6',suf:'m6',t:['1','b3','5','6'],map:{'3':'b3'},slot:['6','6']},
+ '7':{ns:'⁷',name:'Dominant 7',suf:'7',t:['1','3','5','b7'],map:{},slot:['b7','b7']},
+ maj7:{ns:'Δ⁷',name:'Major 7',suf:'maj7',t:['1','3','5','7'],map:{},slot:['7','7']},
+ m7:{ns:'m⁷',name:'Minor 7',suf:'m7',t:['1','b3','5','b7'],map:{'3':'b3'},slot:['b7','b7']},
+ m7b5:{ns:'ø⁷',name:'Half-diminished',suf:'m7♭5',t:['1','b3','b5','b7'],map:{'3':'b3','5':'b5'},slot:['b7','b7']},
+ dim7:{ns:'°⁷',name:'Diminished 7',suf:'°7',t:['1','b3','b5','bb7'],map:{'3':'b3','5':'b5'},slot:['6','bb7']}};
+
+/* Guitar: string 0 = low E. Open-position CAGED templates in their native key: [string, fret, chord degree]. */
+const OPEN=[40,45,50,55,59,64], SNAME=['low E','A','D','G','B','high E'], FRETS=17;
+const SHAPES={
+ C:{root:0,n:[[0,3,'5'],[1,3,'1'],[2,2,'3'],[3,0,'5'],[4,1,'1'],[5,0,'3']],slot:{b7:3,'7':4,'6':3}},
+ A:{root:9,n:[[1,0,'1'],[2,2,'5'],[3,2,'1'],[4,2,'3'],[5,0,'5']],slot:{b7:3,'7':3,'6':5}},
+ G:{root:7,n:[[0,3,'1'],[1,2,'3'],[2,0,'5'],[3,0,'1'],[4,0,'3'],[5,3,'1']],slot:{b7:5,'7':5,'6':5}},
+ E:{root:4,n:[[0,0,'1'],[1,2,'5'],[2,2,'1'],[3,1,'3'],[4,0,'5'],[5,0,'1']],slot:{b7:2,'7':2,'6':4}},
+ D:{root:2,n:[[2,0,'1'],[3,2,'5'],[4,3,'1'],[5,2,'3']],slot:{b7:4,'7':4,'6':4}}};
+const CAGED_ORDER=['C','A','G','E','D'];
+
+function nearestFret(s,f,rootPc,tok){const target=mod(rootPc+TOK[tok][0],12);let best=null;
+  for(let d=0;d<=6;d++){for(const ff of [f-d,f+d]){if(mod(OPEN[s]+ff,12)===target){best=ff;break}}if(best!==null)break}return best}
+function shapeFor(letter,qk){const sh=SHAPES[letter],q=QUAL[qk];
+  let notes=sh.n.map(([s,f,d])=>{const t=(d in q.map)?q.map[d]:d;if(t===null)return null;return {s,f:nearestFret(s,f,sh.root,t),t,f0:f}}).filter(Boolean);
+  if(q.slot){const [slot,tok]=q.slot,s=sh.slot[slot];const i=notes.findIndex(n=>n.s===s);const f0=i>=0?notes[i].f0:sh.n.find(n=>n[0]===s)[1];
+    const nn={s,f:nearestFret(s,f0,sh.root,tok),t:tok,f0};if(i>=0)notes[i]=nn;else notes.push(nn)}
+  return notes.sort((a,b)=>a.s-b.s)}
+function cagedInstances(rootPc,qk,letters){const out=[];
+  for(const L of letters){const tpl=shapeFor(L,qk),base=mod(rootPc-SHAPES[L].root,12);
+    for(const sh of [base-12,base,base+12,base+24]){const ns=tpl.map(n=>({s:n.s,f:n.f+sh,t:n.t}));
+      if(ns.every(n=>n.f>=0&&n.f<=FRETS))out.push({letter:L,notes:ns})}}
+  return out}
+function genPositions(pcs,per,k){const set=new Set(pcs),res=[];const next=p=>{do{p++}while(!set.has(mod(p,12)));return p};
+  for(let f0=0;f0<=FRETS;f0++){if(mod(OPEN[0]+f0,12)!==pcs[k])continue;let p=OPEN[0]+f0,ok=true;const pts=[];
+    for(let s=0;s<6;s++)for(let j=0;j<per;j++){const f=p-OPEN[s];if(f<0||f>FRETS)ok=false;pts.push({s,f});p=next(p)}
+    if(ok)res.push(pts)}
+  return res}
+const KEYS=Array.from({length:12},(_,pc)=>{const n=LPC.indexOf(pc);if(n>=0)return {pc,black:false,sharp:note(n,0),flat:note(n,0)};
+  return {pc,black:true,sharp:note(LPC.indexOf(pc-1),1),flat:note(LPC.indexOf(pc+1),-1)}});
+const accCount=(r,toks)=>toks.reduce((a,t)=>a+Math.abs(spell(r,t).acc),0);
+function triadQ(i3,i5){return i3===4&&i5===7?'maj':i3===3&&i5===7?'min':i3===3&&i5===6?'dim':i3===4&&i5===8?'aug':null}
+function seventhQ(i3,i5,i7){const k=i3+','+i5+','+i7;return {'4,7,11':'maj7','4,7,10':'7','3,7,10':'m7','3,6,10':'m7b5','3,6,9':'dim7'}[k]||null}
+
+/* ---------- State ---------- */
+const PALETTE=[['#E69F00','Orange'],['#56B4E9','Sky blue'],['#009E73','Bluish green'],['#F0E442','Yellow'],['#0072B2','Blue'],['#D55E00','Vermilion'],['#CC79A7','Reddish purple']];
+const LABELS=[['name','Note names'],['interval','Intervals'],['degree','Degrees'],['nashville','Nashville']];
+const DEFAULT={key:9,mode:1,spell:'auto',lo:0,hi:17,lefty:false,theme:'system',
+ chord:{on:true,color:'#E69F00',label:'interval',source:'diatonic',ext:'triad',degree:0,root:9,quality:'min',caged:'all',outline:true,shapes:'bands',iso:null},
+ penta:{on:true,color:'#56B4E9',label:'name',type:'auto',box:'all'},
+ scale:{on:true,color:'#009E73',label:'degree',type:'mode',pos:'all'}};
+const STORE='neckmap-v1';
+let S=JSON.parse(JSON.stringify(DEFAULT));
+try{const raw=localStorage.getItem(STORE);if(raw){const o=JSON.parse(raw);S={...S,...o,chord:{...S.chord,...o.chord},penta:{...S.penta,...o.penta},scale:{...S.scale,...o.scale}}}}catch(e){}
+if(S.chord.outline===false&&!('shapes' in (JSON.parse((()=>{try{return localStorage.getItem(STORE)}catch(e){return null}})()||'{}').chord||{})))S.chord.shapes='off';
+const save=()=>{try{localStorage.setItem(STORE,JSON.stringify(S))}catch(e){}};
+
+/* ---------- Derived model ---------- */
+function model(){
+  const mode=MODES[S.mode],k=KEYS[S.key];
+  let root=k.sharp;
+  if(k.black){if(S.spell==='flat')root=k.flat;else if(S.spell==='auto'&&accCount(k.flat,mode.t)<accCount(k.sharp,mode.t))root=k.flat}
+  const modeNotes=mode.t.map(t=>spell(root,t)), modePcs=new Set(modeNotes.map(n=>n.pc));
+  const flats=modeNotes.some(n=>n.acc<0)||(S.spell==='flat');
+  const parent=spell(root,mode.parent);
+  // diatonic chords
+  const diatonic=modeNotes.map((r,i)=>{const p=j=>mod(modeNotes[(i+j)%7].pc-r.pc,12);
+    const qk=S.chord.ext==='seventh'?seventhQ(p(2),p(4),p(6)):triadQ(p(2),p(4));
+    const q=QUAL[qk];return {root:r,qk,name:nm(r)+q.suf,nash:disp(between(root,r))+q.ns}});
+  // chord
+  let cRoot,cQ;
+  if(S.chord.source==='diatonic'){const d=diatonic[Math.min(S.chord.degree,6)];cRoot=d.root;cQ=d.qk}
+  else{const kk=KEYS[S.chord.root];cRoot=kk.black?(flats?kk.flat:kk.sharp):kk.sharp;cQ=S.chord.quality}
+  const q=QUAL[cQ];
+  const chord={root:cRoot,qk:cQ,toks:q.t,notes:q.t.map(t=>spell(cRoot,t)),name:nm(cRoot)+q.suf,nash:disp(between(root,cRoot))+q.ns};
+  // scale
+  let sToks,sName;
+  if(S.scale.type==='mode'){sToks=mode.t;sName=mode.name}
+  else if(S.scale.type.startsWith('m:')){const m=MODES[+S.scale.type.slice(2)];sToks=m.t;sName=m.name}
+  else{sToks=EXTRA[S.scale.type].t;sName=EXTRA[S.scale.type].name}
+  const pType=S.penta.type==='auto'?mode.penta:S.penta.type;
+  return {mode,root,modeNotes,modePcs,parent,diatonic,chord,flats,
+    scale:{toks:sToks,name:nm(root)+' '+sName.replace(/ \(.*\)/,''),notes:sToks.map(t=>spell(root,t))},
+    penta:{type:pType,toks:PENTA[pType].t,name:nm(root)+' '+PENTA[pType].name,notes:PENTA[pType].t.map(t=>spell(root,t))}};
+}
+const entryMap=(root,toks)=>{const m=new Map();toks.forEach(t=>{const n=spell(root,t);m.set(n.pc,{note:n,tok:t})});return m};
+function everywhere(map){const out=new Map();for(let s=0;s<6;s++)for(let f=0;f<=FRETS;f++){const pc=mod(OPEN[s]+f,12);if(map.has(pc))out.set(s+'-'+f,{s,f,...map.get(pc)})}return out}
+function fromPts(map,lists){const out=new Map();lists.flat().forEach(({s,f})=>{const pc=mod(OPEN[s]+f,12);if(map.has(pc))out.set(s+'-'+f,{s,f,...map.get(pc)})});return out}
+
+function layerData(M){
+  const L={};
+  // scale
+  {const map=entryMap(M.root,M.scale.toks);let pos;
+   if(S.scale.pos!=='all'&&M.scale.toks.length===7)pos=fromPts(map,genPositions(M.scale.notes.map(n=>n.pc),3,+S.scale.pos));else pos=everywhere(map);
+   L.scale={pos,root:M.root}}
+  {const map=entryMap(M.root,M.penta.toks);let pos;
+   if(S.penta.box!=='all')pos=fromPts(map,genPositions(M.penta.notes.map(n=>n.pc),2,+S.penta.box));else pos=everywhere(map);
+   L.penta={pos,root:M.root}}
+  {const map=entryMap(M.chord.root,M.chord.toks);let pos,inst=[];
+   if(S.chord.caged==='none')pos=everywhere(map);
+   else{inst=cagedInstances(M.chord.root.pc,M.chord.qk,S.chord.caged==='all'?CAGED_ORDER:[S.chord.caged]);pos=fromPts(map,inst.map(i=>i.notes))}
+   L.chord={pos,root:M.chord.root,inst}}
+  return L;
+}
+
+/* ---------- Colour / contrast ---------- */
+function lum(hex){const v=hex.replace('#','');const c=[0,2,4].map(i=>parseInt(v.substr(i,2),16)/255).map(x=>x<=0.04045?x/12.92:Math.pow((x+0.055)/1.055,2.4));return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]}
+function ratio(a,b){const x=lum(a),y=lum(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)}
+const tok=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function textOn(fill){return ratio(fill,'#000000')>=ratio(fill,'#ffffff')?'#000000':'#ffffff'}
+function styleFor(color){const board=tok('--board'),bg=tok('--surface');const rb=ratio(color,board),rs=ratio(color,bg),txt=textOn(color);
+  return {color,rb,rs,txt,rt:ratio(color,txt),outline:Math.min(rb,rs)<3}}
+
+/* ---------- Rendering ---------- */
+const NUT=60,FW=56,TOP=68,SS=34,W=NUT+FRETS*FW+8,H=TOP+5*SS+44;
+const rawX=f=>f===0?NUT/2:NUT+(f-.5)*FW, mx=x=>S.lefty?W-x:x, X=f=>mx(rawX(f)), Y=s=>TOP+(5-s)*SS;
+let BOARD_ISO=null;
+const SHAPE_OF={chord:'circle',penta:'square',scale:'diamond'};
+function shapeSvg(kind,cx,cy,fill,stroke,sw,grow=0){
+  const a=`fill="${fill}" stroke="${stroke}" stroke-width="${sw}"`;
+  if(kind==='circle')return `<circle cx="${cx}" cy="${cy}" r="${11.5+grow}" ${a}/>`;
+  if(kind==='square'){const h=12+grow;return `<rect x="${cx-h}" y="${cy-h}" width="${2*h}" height="${2*h}" rx="${5+grow/2}" ${a}/>`}
+  const d=16+grow;return `<polygon points="${cx},${cy-d} ${cx+d},${cy} ${cx},${cy+d} ${cx-d},${cy}" ${a}/>`}
+function labelText(layer,e,M){const mode=S[layer].label;
+  if(mode==='name')return nm(e.note);
+  if(mode==='interval')return IVL[e.tok]||disp(e.tok);
+  if(mode==='degree')return disp(e.tok);
+  return disp(between(M.root,e.note))}
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function renderBoard(M,L,ST){
+  const lo=Math.min(S.lo,S.hi),hi=Math.max(S.lo,S.hi);
+  const bx=Math.min(mx(NUT),mx(NUT+FRETS*FW)),bw=FRETS*FW;
+  let o=`<rect x="${bx}" y="${TOP-17}" width="${bw}" height="${5*SS+34}" rx="3" fill="var(--board)"/>`;
+  // dimmed region outside the focus range
+  const dim=(a,b)=>{if(b<a)return '';const x1=mx(a===0?0:NUT+(a-1)*FW),x2=mx(NUT+b*FW);return `<rect x="${Math.min(x1,x2)}" y="${TOP-17}" width="${Math.abs(x2-x1)}" height="${5*SS+34}" fill="var(--bg)" opacity=".55"/>`};
+  [3,5,7,9,15,17].forEach(f=>o+=`<circle cx="${X(f)}" cy="${TOP+2.5*SS}" r="7" fill="var(--inlay)"/>`);
+  o+=`<circle cx="${X(12)}" cy="${TOP+1.5*SS}" r="7" fill="var(--inlay)"/><circle cx="${X(12)}" cy="${TOP+3.5*SS}" r="7" fill="var(--inlay)"/>`;
+  for(let n=1;n<=FRETS;n++)o+=`<line x1="${mx(NUT+n*FW)}" x2="${mx(NUT+n*FW)}" y1="${TOP-17}" y2="${TOP+5*SS+17}" stroke="var(--fret)" stroke-width="2.2"/>`;
+  o+=`<rect x="${mx(NUT)-(S.lefty?0:6)}" y="${TOP-17}" width="6" height="${5*SS+34}" fill="var(--nut)" stroke="var(--fret)" stroke-width="1"/>`;
+  const sw=[2.6,2.2,1.8,1.4,1.1,.9];
+  for(let s=0;s<6;s++){o+=`<line x1="${mx(14)}" x2="${mx(NUT+FRETS*FW)}" y1="${Y(s)}" y2="${Y(s)}" stroke="var(--string)" stroke-width="${sw[s]}"/>`;
+    o+=`<text x="${mx(7)}" y="${Y(s)}" fill="var(--muted)" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="central">${['E','A','D','G','B','e'][s]}</text>`}
+  for(let f=0;f<=FRETS;f++)o+=`<text x="${X(f)}" y="${TOP+5*SS+34}" fill="var(--muted)" font-size="${[3,5,7,9,12,15,17].includes(f)?14:12}" font-weight="${[3,5,7,9,12,15,17].includes(f)?700:500}" text-anchor="middle">${f===0?'open':f}</text>`;
+  if(lo>0)o+=dim(0,lo-1);if(hi<FRETS)o+=dim(hi+1,FRETS);
+  const inRange=f=>f>=lo&&f<=hi;
+  // CAGED shape display: shaded bands (default) or the original dashed lines
+  const vis=L.chord.inst.filter(ins=>ins.notes.some(n=>inRange(n.f)));
+  const isoId=ins=>ins.letter+'@'+Math.min(...ins.notes.map(n=>n.f));
+  const iso=S.chord.on&&S.chord.shapes!=='off'?vis.find(ins=>isoId(ins)===S.chord.iso):null;
+  const isoKeys=iso?new Set(iso.notes.map(n=>n.s+'-'+n.f)):null;
+  const tabAttrs=ins=>{const on=iso&&isoId(ins)===isoId(iso);return `class="shape-tab" data-iso="${isoId(ins)}" role="button" tabindex="0" aria-pressed="${!!on}" aria-label="${on?'Show all notes again':'Show only the '+ins.letter+' shape'}"`};
+  const faded=ins=>iso&&isoId(ins)!==isoId(iso);
+  let tags='';
+  if(S.chord.on&&S.chord.shapes==='bands'&&vis.length){
+    const sorted=[...vis].sort((a,b)=>Math.min(...a.notes.map(n=>n.f))-Math.min(...b.notes.map(n=>n.f)));
+    sorted.forEach((ins,i)=>{const fs=ins.notes.map(n=>n.f),a=Math.min(...fs),b=Math.max(...fs);
+      const xa=X(a),xb=X(b),half=f=>f===0?NUT/2-3:FW/2-4;
+      const x1=Math.min(xa,xb)-(S.lefty?half(b):half(a)),x2=Math.max(xa,xb)+(S.lefty?half(a):half(b));
+      const op=i%2?.16:.08,act=iso&&isoId(ins)===isoId(iso);
+      o+=`<rect opacity="${faded(ins)?.3:1}" x="${x1}" y="${TOP-17}" width="${x2-x1}" height="${5*SS+34}" rx="6" fill="var(--fg)" fill-opacity="${op}" stroke="var(--fg)" stroke-opacity=".45" stroke-width="1.5"/>`;
+      const cx=(x1+x2)/2;
+      const ty=2+(i%2)*24;tags+=`<g ${tabAttrs(ins)} opacity="${faded(ins)?.45:1}"><rect x="${x1}" y="${ty}" width="${x2-x1}" height="21" rx="5" fill="var(--fg)" fill-opacity="${act?.85:op+.06}" stroke="var(--fg)" stroke-opacity="${act?1:.45}" stroke-width="${act?2:1.5}"/><text x="${cx}" y="${ty+11}" fill="${act?'var(--bg)':'var(--fg)'}" font-size="13" font-weight="700" text-anchor="middle" dominant-baseline="central">${ins.letter} shape${act?' ✕':''}</text></g>`});
+    o+=tags;
+  }
+  if(S.chord.on&&S.chord.shapes==='lines'&&L.chord.inst.length){
+    L.chord.inst.forEach(ins=>{if(!ins.notes.some(n=>inRange(n.f)))return;
+      const pts=ins.notes.map(n=>`${X(n.f)},${Y(n.s)}`).join(' ');
+      o+=`<polyline opacity="${faded(ins)?.25:.9}" points="${pts}" fill="none" stroke="${S.chord.color}" stroke-width="2.4" stroke-dasharray="6 5" stroke-linejoin="round"/>`});
+    L.chord.inst.forEach(ins=>{if(!ins.notes.some(n=>inRange(n.f)))return;const xs=ins.notes.map(n=>X(n.f));const cx=(Math.min(...xs)+Math.max(...xs))/2;
+      o+=`<g ${tabAttrs(ins)} opacity="${faded(ins)?.45:1}"><rect x="${cx-11}" y="26" width="22" height="19" rx="5" fill="var(--surface)" stroke="${S.chord.color}" stroke-width="2"/><text x="${cx}" y="36" fill="var(--fg)" font-size="13" font-weight="700" text-anchor="middle" dominant-baseline="central">${ins.letter}</text></g>`});
+  }
+  // markers
+  const order=['scale','penta','chord'].filter(l=>S[l].on);
+  const keys=new Set();order.forEach(l=>L[l].pos.forEach((v,k)=>keys.add(k)));
+  keys.forEach(k=>{const [s,f]=k.split('-').map(Number);if(!inRange(f))return;if(isoKeys&&!isoKeys.has(k))return;
+    const cx=X(f),cy=Y(s);let g='',top=null,parts=[];
+    order.forEach(l=>{const e=L[l].pos.get(k);if(!e)return;const st=ST[l];
+      g+=shapeSvg(SHAPE_OF[l],cx,cy,st.color,st.outline?'var(--ink)':'none',st.outline?1.6:0);top={l,e};
+      parts.push(`${l==='chord'?M.chord.name+' chord':l==='penta'?'Pentatonic':'Scale'}: ${IVL[e.tok]||disp(e.tok)} (${disp(e.tok)})`)});
+    if(!top)return;
+    if(top.e.tok==='1')g+=shapeSvg(SHAPE_OF[top.l],cx,cy,'none','var(--fg)',2.4,4.5);
+    const t=labelText(top.l,top.e,M),fs=t.length>3?9.5:top.l==='scale'?11:12;
+    g+=`<text x="${cx}" y="${cy+.5}" fill="${ST[top.l].txt}" font-size="${fs}" font-weight="700" text-anchor="middle" dominant-baseline="central">${esc(t)}</text>`;
+    const tip=`<b>${nm(top.e.note)}</b> · ${SNAME[s]} string, ${f===0?'open':'fret '+f}<br>${parts.join('<br>')}<br>Nashville: ${disp(between(M.root,top.e.note))}`;
+    o+=`<g class="note" data-tip="${tip.replace(/"/g,'&quot;')}">${g}</g>`});
+  BOARD_ISO=iso?iso.letter:null;
+  const svg=document.getElementById('board');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML=o;
+}
+
+function iconSvg(kind,color,outline){const st=outline?'var(--ink)':'none';
+  return `<svg width="26" height="26" viewBox="0 0 40 40" aria-hidden="true">${shapeSvg(kind,20,20,color,st,outline?1.6:0)}</svg>`}
+
+function renderText(M,ST){
+  const out=n=>!M.modePcs.has(n.pc);
+  const row=(l,label,name,notes,extra)=>{const off=notes.filter(out).map(nm);
+    return `<div class="row"><span class="tag">${iconSvg(SHAPE_OF[l],ST[l].color,ST[l].outline).replace('width="26" height="26"','width="18" height="18" style="vertical-align:-3px;margin-right:6px"')}${label}</span><span>${esc(name)}</span><span class="notes">${notes.map(nm).join(' ')}</span>${extra||''}${off.length?`<span class="warn">Outside ${esc(nm(M.root)+' '+M.mode.name.replace(/ \(.*\)/,''))}: ${off.join(' ')}</span>`:''}</div>`};
+  let h='';
+  if(S.chord.on)h+=row('chord','Chord',`${M.chord.name} (${M.chord.nash})`,M.chord.notes,`<span>${M.chord.toks.map(disp).join(' ')}</span>`);
+  if(S.penta.on)h+=row('penta','Pentatonic',M.penta.name,M.penta.notes);
+  if(S.scale.on)h+=row('scale','Scale',M.scale.name,M.scale.notes,`<span>${M.scale.toks.map(disp).join(' ')}</span>`);
+  if(!h)h='<div class="row warn">All layers are hidden. Use the Show buttons below.</div>';
+  document.getElementById('summary').innerHTML=h;
+  document.getElementById('g-parent').innerHTML=`<b>${nm(M.parent)} major</b> · ${M.modeNotes.map(nm).join(' ')}`;
+  const leg=[['chord','Circle = chord'],['penta','Square = pentatonic'],['scale','Diamond = scale']].map(([l,t])=>`<span>${iconSvg(SHAPE_OF[l],ST[l].color,ST[l].outline).replace('width="26" height="26"','width="18" height="18"')}${t}</span>`).join('');
+  document.getElementById('legend').innerHTML=leg+`<span><svg width="18" height="18" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="11" fill="none" stroke="var(--fg)" stroke-width="3"/></svg>Ring = root</span>${S.chord.shapes==='lines'?`<span><svg width="26" height="10" aria-hidden="true"><line x1="1" y1="5" x2="25" y2="5" stroke="${S.chord.color}" stroke-width="2.4" stroke-dasharray="6 5"/></svg>Dashed line = notes of one CAGED shape</span>`:S.chord.shapes==='bands'?`<span><svg width="26" height="14" aria-hidden="true"><rect x="1" y="1" width="24" height="12" rx="3" fill="var(--fg)" fill-opacity=".12" stroke="var(--fg)" stroke-opacity=".45"/></svg>Shaded band = frets one CAGED shape covers</span>`:''}<span>Hover or tap a note for details. Click a shape label to show only that shape.</span>${BOARD_ISO?`<span class="iso-note">Showing the ${BOARD_ISO} shape only. Click its label again to show everything.</span>`:''}`;
+  ['chord','penta','scale'].forEach(l=>{document.getElementById('ico-'+l).innerHTML=iconSvg(SHAPE_OF[l],ST[l].color,ST[l].outline)});
+  const names={chord:'Chord',penta:'Pentatonic',scale:'Scale / mode'};
+  document.getElementById('a11y-body').innerHTML=['chord','penta','scale'].map(l=>{const s=ST[l],c=PALETTE.find(p=>p[0]===s.color);
+    const f=r=>r.toFixed(2)+':1';const markerOk=Math.min(s.rb,s.rs)>=3||s.outline;const ok=markerOk&&s.rt>=4.5;
+    return `<tr><td>${names[l]}</td><td><span class="sw" style="background:${s.color}"></span>${c?c[1]:s.color}</td><td>${f(s.rb)}</td><td>${f(s.rs)}</td><td>${f(s.rt)} (${s.txt==='#000000'?'black':'white'})</td><td class="${ok?'pass':'fail'}">${ok?(s.outline?'Pass (outlined)':'Pass'):'Fail'}</td></tr>`}).join('');
+}
+
+/* ---------- Controls ---------- */
+const $=id=>document.getElementById(id);
+const opts=(el,list,val)=>{el.innerHTML=list.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join('');if(val!==undefined)el.value=String(val)};
+function fillStatic(){
+  opts($('g-key'),KEYS.map(k=>[k.pc,k.black?nm(k.sharp)+' / '+nm(k.flat):nm(k.sharp)]),S.key);
+  opts($('g-mode'),MODES.map((m,i)=>[i,m.name]),S.mode);
+  const fr=Array.from({length:FRETS+1},(_,i)=>[i,i===0?'Open':String(i)]);opts($('g-lo'),fr,S.lo);opts($('g-hi'),fr,S.hi);
+  opts($('chord-quality'),Object.entries(QUAL).map(([k,q])=>[k,q.name]),S.chord.quality);
+  document.querySelectorAll('.labelsel').forEach(el=>opts(el,LABELS));
+  document.querySelectorAll('.colorsel').forEach(el=>opts(el,PALETTE));
+  opts($('penta-box'),[['all','Whole neck'],...[0,1,2,3,4].map(i=>[i,'Box '+(i+1)])],S.penta.box);
+  opts($('scale-pos'),[['all','Whole neck'],...[0,1,2,3,4,5,6].map(i=>[i,'Position '+(i+1)+' (3 per string)'])],S.scale.pos);
+}
+function fillDynamic(M){
+  opts($('chord-degree'),M.diatonic.map((d,i)=>[i,`${d.name}  ·  ${d.nash}`]),S.chord.degree);
+  opts($('chord-root'),KEYS.map(k=>[k.pc,nm(k.black?(M.flats?k.flat:k.sharp):k.sharp)]),S.chord.root);
+  const r=nm(M.root);
+  opts($('scale-type'),[['mode',`Selected mode (${r} ${M.mode.name.replace(/ \(.*\)/,'')})`],...MODES.map((m,i)=>['m:'+i,`${r} ${m.name}`]),...Object.entries(EXTRA).map(([k,v])=>[k,`${r} ${v.name}`])],S.scale.type);
+  $('scale-pos').disabled=M.scale.toks.length!==7;
+  $('penta-type').options[0].textContent=`Match the mode (${M.mode.penta==='maj'?'major':'minor'})`;
+  const diat=S.chord.source==='diatonic';$('f-chord-degree').hidden=!diat;$('f-chord-ext').hidden=!diat;$('f-chord-root').hidden=diat;$('f-chord-quality').hidden=diat;
+  ['chord','penta','scale'].forEach(l=>{$(l+'-on').setAttribute('aria-pressed',S[l].on);$(l+'-on').textContent=S[l].on?'Shown':'Hidden';$('card-'+l).classList.toggle('off',!S[l].on);
+    $(l+'-label').value=S[l].label;$(l+'-color').value=S[l].color});
+  $('g-key').value=S.key;$('g-mode').value=S.mode;$('g-spell').value=S.spell;$('g-lo').value=S.lo;$('g-hi').value=S.hi;$('g-lefty').checked=S.lefty;$('g-theme').value=S.theme;
+  $('chord-source').value=S.chord.source;$('chord-ext').value=S.chord.ext;$('chord-caged').value=S.chord.caged;$('chord-shapes').value=S.chord.shapes;$('chord-quality').value=S.chord.quality;
+  $('penta-type').value=S.penta.type;$('penta-box').value=S.penta.box;$('scale-pos').value=S.scale.pos;
+}
+const hostTheme=document.documentElement.getAttribute('data-theme');
+function applyTheme(){const r=document.documentElement;if(S.theme==='system'){if(hostTheme)r.setAttribute('data-theme',hostTheme);else r.removeAttribute('data-theme')}else r.setAttribute('data-theme',S.theme)}
+function render(){applyTheme();const M=model();fillDynamic(M);const L=layerData(M);
+  const ST={chord:styleFor(S.chord.color),penta:styleFor(S.penta.color),scale:styleFor(S.scale.color)};
+  renderBoard(M,L,ST);renderText(M,ST);save()}
+
+const bind=(id,fn,ev='change')=>$(id).addEventListener(ev,e=>{fn(e.target);render()});
+bind('g-key',t=>{S.key=+t.value;S.chord.root=+t.value});bind('g-mode',t=>S.mode=+t.value);bind('g-spell',t=>S.spell=t.value);
+bind('g-lo',t=>S.lo=+t.value);bind('g-hi',t=>S.hi=+t.value);bind('g-lefty',t=>S.lefty=t.checked);bind('g-theme',t=>S.theme=t.value);
+['chord','penta','scale'].forEach(l=>{bind(l+'-on',()=>S[l].on=!S[l].on,'click');bind(l+'-label',t=>S[l].label=t.value);bind(l+'-color',t=>S[l].color=t.value)});
+bind('chord-source',t=>S.chord.source=t.value);bind('chord-ext',t=>S.chord.ext=t.value);bind('chord-degree',t=>S.chord.degree=+t.value);
+bind('chord-root',t=>S.chord.root=+t.value);bind('chord-quality',t=>S.chord.quality=t.value);bind('chord-caged',t=>S.chord.caged=t.value);bind('chord-shapes',t=>S.chord.shapes=t.value);
+bind('penta-type',t=>S.penta.type=t.value);bind('penta-box',t=>S.penta.box=t.value==='all'?'all':+t.value);
+bind('scale-type',t=>S.scale.type=t.value);bind('scale-pos',t=>S.scale.pos=t.value==='all'?'all':+t.value);
+const board=$('board'),tipEl=$('tip'),panel=document.querySelector('.board-panel');
+function toggleIso(id){S.chord.iso=S.chord.iso===id?null:id;render();const el=board.querySelector(`[data-iso="${id}"]`);if(el)el.focus()}
+board.addEventListener('click',e=>{const t=e.target.closest('[data-iso]');if(t)toggleIso(t.dataset.iso)});
+board.addEventListener('keydown',e=>{const t=e.target.closest('[data-iso]');if(t&&(e.key==='Enter'||e.key===' ')){e.preventDefault();toggleIso(t.dataset.iso)}});
+function showTip(e){const g=e.target.closest('.note');if(!g){tipEl.hidden=true;return}
+  tipEl.innerHTML=g.dataset.tip;tipEl.hidden=false;const pr=panel.getBoundingClientRect(),gr=g.getBoundingClientRect();
+  let x=gr.left-pr.left+gr.width/2-tipEl.offsetWidth/2,y=gr.top-pr.top-tipEl.offsetHeight-8;
+  x=Math.max(8,Math.min(x,pr.width-tipEl.offsetWidth-8));if(y<4)y=gr.bottom-pr.top+8;
+  tipEl.style.left=x+'px';tipEl.style.top=y+'px'}
+board.addEventListener('pointerover',showTip);board.addEventListener('pointerdown',showTip);
+board.addEventListener('pointerleave',()=>tipEl.hidden=true);
+document.addEventListener('pointerdown',e=>{if(!board.contains(e.target))tipEl.hidden=true});
+document.querySelector('.board-scroll').addEventListener('scroll',()=>tipEl.hidden=true);
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render)}catch(e){}
+fillStatic();render();
+window.NM={spell,nm,between,MODES,QUAL,shapeFor,cagedInstances,genPositions,model,S,render,note,KEYS};
+</script>
+</body>
+</html>
