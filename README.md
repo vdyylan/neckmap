@@ -12,13 +12,12 @@ Notes can be labelled with note names, intervals, scale degrees or Nashville num
 
 ## Use it
 
-Open the live page: _add your link here after publishing_
+Open the live page: _link placeholder_
 
 Or download `index.html` and open it in any browser. There is nothing to install.
 
 ## Details
 
-- Standard tuning, frets 0-17.
 - Single file with no build step and no dependencies. Fonts load from Google Fonts.
 - Settings are saved in your own browser (local storage). Nothing is sent anywhere.
 - Colours come from the Okabe-Ito colour-blind-safe palette. Markers and labels are checked against WCAG 2 contrast ratios, and the page includes a contrast table.
